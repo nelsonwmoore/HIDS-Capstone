@@ -1,0 +1,17 @@
+Metadata-Version: 2.1
+Name: mdb-tools
+Version: 0.1
+Summary: Tools to work with the Metamodel Database
+Home-page: https://github.com/nelsonwmoore/HIDS-Capstone
+Author: Nelson Moore
+Author-email: nelsonwmoore@gmail.com
+Project-URL: Bug Tracker, https://github.com/nelsonwmoore/HIDS-Capstone/issues
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.6
+Description-Content-Type: text/markdown
+License-File: LICENSE
+
+# HIDS-Capstone
+ 
