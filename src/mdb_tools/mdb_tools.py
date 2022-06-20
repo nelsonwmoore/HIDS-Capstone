@@ -1,6 +1,5 @@
 from neo4j import GraphDatabase, basic_auth
-import random
-import string
+from nanoid import generate
 
 def check_term_exists(tx, term_val):
     result = tx.run("MATCH (t:term {value: $term_val}) "
@@ -23,17 +22,17 @@ def create_term(tx, term_val):
             term_val=term_val)
     print(f"Created new Term with value: {term_val}")
 
-def generate_nanoid():
-    valid_chars = string.ascii_letters + string.digits
-    nanoid = ''.join(random.choice(valid_chars) for i in range(6))
-    return nanoid
+def make_nano():
+    return generate(
+        size=6,
+        alphabet="abcdefghijkmnopqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ0123456789"
+    )
 
 def generate_unique_nanoid(tx):
-    nanoid = generate_nanoid()
+    nanoid = make_nano()
     result = tx.run("MATCH (n {nanoid: $nanoid}) "
                     "RETURN n.nanoid", nanoid=nanoid)
     if not [record["n.nanoid"] for record in result]:
-        #print(nanoid)
         return nanoid
     else:
         generate_unique_nanoid(tx)
@@ -43,7 +42,6 @@ def create_concept(tx, concept_nanoid):
             concept_nanoid=concept_nanoid)
     print(f"Created new Concept with nanoid: {concept_nanoid}")
 
-# link term and concept
 def create_represents_relationship(tx, term_val, concept_nanoid):
         tx.run("MATCH (t:term {value: $term_val}), "
                 "(c:concept {nanoid: $concept_nanoid}) "
