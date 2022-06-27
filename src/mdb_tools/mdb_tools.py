@@ -1,5 +1,8 @@
 from neo4j import GraphDatabase, basic_auth
 from nanoid import generate
+import csv
+import spacy
+import en_ner_bionlp13cg_md #en_core_sci_lg another potential option
 
 def check_term_exists(tx, term):
     if not ("origin_name" in term and "value" in term):
@@ -51,16 +54,16 @@ def create_concept(tx, concept: dict):
     print(f"Created new Concept with nanoid: {concept['nanoid']}")
 
 def create_represents_relationship(tx, term: dict, concept: dict):
-        if not ("origin_name" in term and "value" in term):
-                raise RuntimeError("arg 'term' must contain both origin_name and value keys")
-        if not ("nanoid" in concept):
-                raise RuntimeError("arg 'concept' must contain nanoid key")
-        tx.run("MATCH (t:term {value: $term_val, origin_name:$term_origin}), "
-                "(c:concept {nanoid: $concept_nanoid}) "
-                "MERGE (t)-[r:represents]->(c) ", 
-                term_val=term["value"], term_origin=term["origin_name"], 
-                concept_nanoid=concept["nanoid"])
-        print(f"Term with value: {term['value']} and origin: {term['origin_name']} now represents Concept with nanoid: {concept['nanoid']}")
+    if not ("origin_name" in term and "value" in term):
+            raise RuntimeError("arg 'term' must contain both origin_name and value keys")
+    if not ("nanoid" in concept):
+            raise RuntimeError("arg 'concept' must contain nanoid key")
+    tx.run("MATCH (t:term {value: $term_val, origin_name:$term_origin}), "
+            "(c:concept {nanoid: $concept_nanoid}) "
+            "MERGE (t)-[r:represents]->(c) ", 
+            term_val=term["value"], term_origin=term["origin_name"], 
+            concept_nanoid=concept["nanoid"])
+    print(f"Term with value: {term['value']} and origin: {term['origin_name']} now represents Concept with nanoid: {concept['nanoid']}")
 
 def link_two_terms(term_1: dict, term_2: dict) -> None:
     """
@@ -238,3 +241,37 @@ def merge_two_concepts(concept_1: dict, concept_2: dict) -> None:
             session.write_transaction(create_represents_relationship, term, concept_1)
 
     driver.close()
+
+def get_term_synonyms(tx, term: dict, threshhold=0.8):
+    if not ("origin_name" in term and "value" in term):
+        raise RuntimeError("arg 'term' must contain both origin_name and value keys")    
+    
+    # load spaCy NER model
+    nlp = en_ner_bionlp13cg_md.load()
+
+    synonyms = []
+    result = tx.run("MATCH (t:term) "
+                    "RETURN t.value AS term_val, t.origin_name AS term_origin")
+    for record in result:
+        # calculate similarity between each Term and input Term
+        term_1 = nlp(term["value"])
+        term_2 = nlp(str(record["term_val"]))
+        similarity = term_1.similarity(term_2)
+        # if similarity threshold met, add to list of potential synonyms
+        if similarity >= threshhold:
+            synonym = {
+                "value": record["term_val"],
+                "origin_name": record["term_origin"],
+                "similarity": similarity,
+                "valid_synonym": 0 # 0 for now when downloading; mark 1 if synonym when uploadings
+            }
+            synonyms.append(synonym)
+    synonyms_sorted = sorted(synonyms, key=lambda d: d["similarity"], reverse=True)
+    return synonyms_sorted
+
+def potential_synonyms_to_csv(input_data: list[dict], output_path: str) -> None:
+    with open(output_path, "w", encoding="utf8", newline="") as output_file:
+        dict_writer = csv.DictWriter(output_file,
+                                    fieldnames=input_data[0].keys())
+        dict_writer.writeheader()
+        dict_writer.writerows(input_data)
