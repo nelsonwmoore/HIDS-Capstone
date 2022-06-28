@@ -37,15 +37,6 @@ def make_nano():
         alphabet="abcdefghijkmnopqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ0123456789"
     )
 
-def generate_unique_nanoid(tx):
-    nanoid = make_nano()
-    result = tx.run("MATCH (n {nanoid: $nanoid}) "
-                    "RETURN n.nanoid", nanoid=nanoid)
-    if not [record["n.nanoid"] for record in result]:
-        return nanoid
-    else:
-        generate_unique_nanoid(tx)
-
 def create_concept(tx, concept: dict):
     if not ("nanoid" in concept):
         raise RuntimeError("arg 'concept' must contain nanoid key")
@@ -93,7 +84,7 @@ def link_two_terms(term_1: dict, term_2: dict) -> None:
 
             # Terms are not already connected by a Concept
             elif set(term_1_concepts).isdisjoint(set(term_2_concepts)):                               
-                new_nanoid = session.read_transaction(generate_unique_nanoid)
+                new_nanoid = make_nano()
                 new_concept = {"nanoid": new_nanoid}
                 session.write_transaction(create_concept, {"nanoid": new_nanoid})
                 session.write_transaction(create_represents_relationship, term_1, new_concept)
@@ -116,7 +107,7 @@ def link_two_terms(term_1: dict, term_2: dict) -> None:
                 session.write_transaction(create_represents_relationship, new_term, existing_concept)
 
             else:      
-                new_nanoid = session.read_transaction(generate_unique_nanoid)
+                new_nanoid = make_nano()
                 new_concept = {"nanoid": new_nanoid}
                 session.write_transaction(create_concept, new_concept)
                 session.write_transaction(create_term, new_term)
@@ -126,7 +117,7 @@ def link_two_terms(term_1: dict, term_2: dict) -> None:
         else:
             session.write_transaction(create_term, term_1)
             session.write_transaction(create_term, term_2)
-            new_nanoid = session.read_transaction(generate_unique_nanoid)
+            new_nanoid = make_nano()
             session.write_transaction(create_concept, new_nanoid)
             session.write_transaction(create_represents_relationship, term_1, new_nanoid)
             session.write_transaction(create_represents_relationship, term_2, new_nanoid)
@@ -205,7 +196,7 @@ def link_concepts_to_predicate(concept_1: dict, concept_2: dict, predicate_handl
     with driver.session() as session:
 
         # create predicate
-        new_predicate_nanoid = session.read_transaction(generate_unique_nanoid)
+        new_predicate_nanoid = make_nano()
         new_predicate = {"handle": predicate_handle, "nanoid": new_predicate_nanoid}
         session.write_transaction(create_predicate, new_predicate)
 
