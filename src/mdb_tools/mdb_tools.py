@@ -126,7 +126,10 @@ def link_two_terms(term_1: dict, term_2: dict) -> None:
 
 def create_predicate(tx, predicate: dict):
     if not ("handle" in predicate and "nanoid" in predicate):
-            raise RuntimeError("arg 'predicate' must contain both handle and nanoid keys")
+        raise RuntimeError("arg 'predicate' must contain both handle and nanoid keys")
+    valid_predicate_handles = ['exactMatch', 'closeMatch', 'broader', 'narrower', 'related']
+    if predicate["handle"] not in valid_predicate_handles:
+        raise RuntimeError(f"'handle' key must be one the following: {valid_predicate_handles}")
     tx.run("MERGE (p:predicate {handle: $predicate_handle, nanoid: $predicate_nanoid})", 
             predicate_handle=predicate["handle"], predicate_nanoid=predicate["nanoid"])
     print(f"Created new Predicate with handle: {predicate['handle']} and nanoid: {predicate['nanoid']}")
