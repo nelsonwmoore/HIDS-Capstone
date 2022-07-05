@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: mdb-tools
-Version: 0.4.3
+Version: 0.5.0
 Summary: Tools to work with the Metamodel Database
 Home-page: https://github.com/nelsonwmoore/HIDS-Capstone
 Author: Nelson Moore
@@ -15,3 +15,4 @@ License-File: LICENSE
 
 # HIDS-Capstone
  
+Notebook with instructions & examples: [MDB Tools](https://github.com/nelsonwmoore/HIDS-Capstone/blob/main/mdb_tools_notebook.ipynb)
