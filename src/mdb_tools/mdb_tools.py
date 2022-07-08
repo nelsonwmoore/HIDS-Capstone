@@ -3,7 +3,7 @@ from nanoid import generate
 import csv
 import spacy
 import en_ner_bionlp13cg_md #en_core_sci_lg another potential option
-from bento_meta.objects import Term, Concept, Predicate, mergespec
+from bento_meta.objects import Term, Concept, Predicate
 from bento_meta.mdb import MDB
 
 def check_term_exists(tx, term: object) -> bool:
@@ -127,15 +127,6 @@ def link_two_terms(term_1: object, term_2: object) -> None:
     
     driver.close()
 
-class HandledPredicate(Predicate):
-    """Subclass that adds a handle to predicate object"""
-    attspec_ = {"handle": "simple"}
-    mapspec_ = {}
-    (attspec, _mapspec) = mergespec("HandledPredicate", attspec_, mapspec_)
-
-    def __init__(self, init=None):
-        super().__init__(init=init)
-
 def create_predicate(tx, predicate: object) -> None:
     """Creates a predicate node using a HandledPredicate object (for now)"""
     if not (predicate.handle and predicate.nanoid):
@@ -212,7 +203,7 @@ def link_concepts_to_predicate(concept_1: object, concept_2: object, predicate_h
     with driver.session() as session:
 
         # create predicate
-        new_predicate = HandledPredicate()
+        new_predicate = Predicate()
         new_predicate.handle = predicate_handle
         new_predicate.nanoid = make_nano()
         session.write_transaction(create_predicate, new_predicate)
