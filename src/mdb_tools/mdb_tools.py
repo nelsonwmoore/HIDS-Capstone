@@ -6,6 +6,13 @@ import en_ner_bionlp13cg_md #en_core_sci_lg another potential option
 from bento_meta.objects import Term, Concept, Predicate
 from bento_meta.mdb import MDB
 
+# MDB sandbox (adding here for now - 
+# probably removing driver from funcs that use here and keeping that w/in notebook later)
+url = "bolt://localhost:7687" # <URL for database>
+user = "neo4j" # <Username for database>
+password = "noble-use-dairy" # <Password for database>
+driver = GraphDatabase.driver(url, auth=(user, password))
+
 def check_term_exists(tx, term: object) -> bool:
     if not (term.origin_name and term.value):
         raise RuntimeError("arg 'term' must have both origin_name and value")    
@@ -177,6 +184,18 @@ def get_terms(tx, concept: object) -> list[object]:
         terms.append(Term({"value": record["term_val"], "origin_name": record["term_origin"]}))
     return terms
 
+def get_predicates(tx, concept: object) -> list[object]:
+    if not (concept.nanoid):
+        raise RuntimeError("arg 'concept' must have nanoid")
+    preds = []
+    result = tx.run("MATCH (p:predicate)-[r]->(c:concept {nanoid: $concept_nanoid}) "
+                    "RETURN p.handle AS pred_handle, p.nanoid AS pred_nano, type(r) as edge",
+                    concept_nanoid=concept.nanoid)
+    for record in result:
+        preds.append([Predicate({"handle": record["pred_handle"], "nanoid": record["pred_nano"]}),
+                    record["edge"]])
+    return preds
+
 def detach_delete_predicate(tx, predicate: object) -> None:
     if not (predicate.handle and predicate.nanoid):
         raise RuntimeError("arg 'predicate' must have both handle and nanoid")
@@ -219,25 +238,30 @@ def merge_two_concepts(concept_1: object, concept_2: object) -> None:
     Combine two synonymous Concepts into a single Concept.
 
     This function takes two synonymous Concept as objects and
-    merges them into a single Concept.
+    merges them into a single Concept along with any connected
+    Terms and Predicates.
     """
     if not (concept_1.nanoid and concept_2.nanoid):
         raise RuntimeError("args 'concept_1' and 'concept_2' must have nanoid")
 
-    with driver.session() as session:
-        
+    with driver.session() as session:        
         # get list of all terms connected to concept 2
         c2_terms = session.read_transaction(get_terms, concept_2)
-
         # get list of all predicates connected to concept 2 (wip)
-
+        c2_preds = session.read_transaction(get_predicates, concept_2)
         # delete concept 2
         session.write_transaction(detach_delete_concept, concept_2)
-
-        # connect terms from deleted concept to remaining concept
+        # connect terms from deleted (c2) to remaining concept (c1)
         for term in c2_terms:
             session.write_transaction(create_represents_relationship, term, concept_1)
-
+        # connect predicates from deleted (c2) to remaining concept (c1)
+        for pred in c2_preds:
+            c2_edge = pred[1]
+            c2_pred = Predicate({"handle": pred[0].handle, "nanoid": pred[0].nanoid})
+            if c2_edge == "has_object":
+                session.write_transaction(create_object_relationship, concept_1, c2_pred)
+            elif c2_edge == "has_subject":
+                session.write_transaction(create_subject_relationship, concept_1, c2_pred)
     driver.close()
 
 def get_term_synonyms(tx, term: object, threshhold: float = 0.8) -> list[dict]:
