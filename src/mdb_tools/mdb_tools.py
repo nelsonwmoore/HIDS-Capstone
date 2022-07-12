@@ -1,10 +1,8 @@
 from neo4j import GraphDatabase, basic_auth
 from nanoid import generate
 import csv
-import spacy
 import en_ner_bionlp13cg_md #en_core_sci_lg another potential option
 from bento_meta.objects import Term, Concept, Predicate
-from bento_meta.mdb import MDB
 
 # MDB sandbox (adding here for now - 
 # probably removing driver from funcs that use here and keeping that w/in notebook later)
@@ -297,3 +295,13 @@ def potential_synonyms_to_csv(input_data: list[dict], output_path: str) -> None:
                                     fieldnames=input_data[0].keys())
         dict_writer.writeheader()
         dict_writer.writerows(input_data)
+
+def link_term_synonyms_csv(term: object, csv_path: str) -> None:
+    with open(csv_path) as csvfile:
+        synonym_reader = csv.reader(csvfile)
+        for line in synonym_reader:
+            if line[3] == "1":
+                synonym = Term()
+                synonym.value = line[0]
+                synonym.origin_name = line[1]
+                link_two_terms(term, synonym)
