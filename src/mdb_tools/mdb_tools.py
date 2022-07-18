@@ -91,11 +91,22 @@ def link_two_terms(term_1: object, term_2: object) -> None:
 
             # Terms are not already connected by a Concept
             elif set(term_1_concepts).isdisjoint(set(term_2_concepts)):                               
-                new_concept = Concept()
-                new_concept.nanoid = make_nano()
-                session.write_transaction(create_concept, new_concept)
-                session.write_transaction(create_represents_relationship, term_1, new_concept)
-                session.write_transaction(create_represents_relationship, term_2, new_concept)
+                # One of Terms already has a represents Concept
+                if term_1_concepts:
+                    existing_concept = Concept()
+                    existing_concept.nanoid = term_1_concepts[0]                    
+                    session.write_transaction(create_represents_relationship, term_2, existing_concept)
+                elif term_2_concepts:
+                    existing_concept = Concept()
+                    existing_concept.nanoid = term_2_concepts[0]
+                    session.write_transaction(create_represents_relationship, term_1, existing_concept)                    
+                # Neither Term has an associated Concept
+                else:
+                    new_concept = Concept()
+                    new_concept.nanoid = make_nano()
+                    session.write_transaction(create_concept, new_concept)
+                    session.write_transaction(create_represents_relationship, term_1, new_concept)
+                    session.write_transaction(create_represents_relationship, term_2, new_concept)
 
         elif term_1_exists or term_2_exists:
             if term_1_exists:
@@ -133,7 +144,7 @@ def link_two_terms(term_1: object, term_2: object) -> None:
     driver.close()
 
 def create_predicate(tx, predicate: object) -> None:
-    """Creates a predicate node using a HandledPredicate object (for now)"""
+    """Creates a predicate node using a Predicate object"""
     if not (predicate.handle and predicate.nanoid):
         raise RuntimeError("arg 'predicate' must have both handle and nanoid")
     valid_predicate_handles = ['exactMatch', 'closeMatch', 'broader', 'narrower', 'related']
@@ -245,7 +256,7 @@ def merge_two_concepts(concept_1: object, concept_2: object) -> None:
     with driver.session() as session:        
         # get list of all terms connected to concept 2
         c2_terms = session.read_transaction(get_terms, concept_2)
-        # get list of all predicates connected to concept 2 (wip)
+        # get list of all predicates connected to concept 2
         c2_preds = session.read_transaction(get_predicates, concept_2)
         # delete concept 2
         session.write_transaction(detach_delete_concept, concept_2)
