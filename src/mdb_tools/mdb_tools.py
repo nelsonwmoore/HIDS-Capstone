@@ -5,329 +5,531 @@ module docstring goes here
 import csv
 
 import en_ner_bionlp13cg_md  # en_core_sci_lg another potential option
+from bento_meta.entity import Entity
+from bento_meta.mdb import read_txn_value
+from bento_meta.mdb.writeable import WriteableMDB, write_txn
 from bento_meta.objects import Concept, Predicate, Term
 from nanoid import generate
 
+# pylint: disable=consider-using-f-string
 
-def check_term_exists(tx, term: Term) -> bool:
-    """If given Term node exists in database, returns True, otherwise returns False"""
-    if not (term.origin_name and term.value):
-        raise RuntimeError("arg 'term' must have both origin_name and value")
-    result = tx.run("MATCH (t:term {value: $term_val, origin_name: $term_origin}) "
-                    "RETURN t.value AS term", term_val=term.value, term_origin=term.origin_name)
-    if [record["term"] for record in result]:
-        return True
-    else:
-        return False
+def get_entity_type(entity: Entity):
+    """returns type of entity"""
+    if entity.__class__.__name__.lower() == "edge":
+        return "relationship"
+    return entity.__class__.__name__.lower()
 
-def get_concepts(tx, term: Term) -> list[Concept]:
-    """Returns list of concepts represented by given Term"""
-    if not (term.origin_name and term.value):
-        raise RuntimeError("arg 'term' must have both origin_name and value")
-    concepts = []
-    result = tx.run("MATCH (t:term {value: $term_val, origin_name:$term_origin}) "
-                    "-[:represents]->(c:concept) RETURN c.nanoid AS concept",
-                    term_val=term.value, term_origin=term.origin_name)
-    for record in result:
-        concepts.append(record["concept"])
-    return concepts
+class NelsonMDB(WriteableMDB):
+    """Adds mdb-tools to WriteableMDB"""
+    def __init__(self, uri, user, password):
+        WriteableMDB.__init__(self, uri, user, password)
 
-def create_term(tx, term: Term) -> None:
-    """Adds given Term node to database"""
-    if not (term.origin_name and term.value):
-        raise RuntimeError("arg 'term' must have both origin_name and value")
-    tx.run("MERGE (t:term {value: $term_val, origin_name:$term_origin})",
-            term_val=term.value, term_origin=term.origin_name)
-    print(f"Created new Term with value: {term.value} and origin: {term.origin_name}")
+    def get_entity_attrs(self, entity: Entity, output_str: bool = True):
+        """
+        Returns attributes as str or dict for given entity.
 
-def make_nano():
-    """Generates valid nanoid"""
-    return generate(
-        size=6,
-        alphabet="abcdefghijkmnopqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ0123456789"
-    )
+        Param output_as_str parm defaults to True and returns a string
+        that is usable in Cypher query as node properties.
 
-def create_concept(tx, concept: Concept) -> None:
-    """Adds given Concept node to database"""
-    if not concept.nanoid:
-        raise RuntimeError("arg 'concept' must have nanoid")
-    tx.run("MERGE (n:concept {nanoid: $concept_nanoid})",
-            concept_nanoid=concept.nanoid)
-    print(f"Created Concept node with nanoid: {concept.nanoid}")
+        If output_as_str = False, return dict of attributes instead,
+        which is used as params of function with write_txn decorator.
+        """
+        attr_dict = {}
+        for key, val in vars(entity).items():
+            if val and val is not None and key != "pvt":
+                attr_dict[key] = val
 
-def create_represents_relationship(tx, term: Term, concept: Concept) -> None:
-    """Adds represents relationship between given Term and Concept nodes"""
-    if not (term.origin_name and term.value):
-        raise RuntimeError("arg 'term' must have both origin_name and value")
-    if not concept.nanoid:
-        raise RuntimeError("arg 'concept' must have nanoid")
-    tx.run("MATCH (t:term {value: $term_val, origin_name: $term_origin}), "
-            "(c:concept {nanoid: $concept_nanoid}) "
-            "MERGE (t)-[r:represents]->(c)",
-            term_val=term.value, term_origin=term.origin_name,
-            concept_nanoid=concept.nanoid)
-    print(f"Created represents relationship between Term with value: {term.value} "
-        f"and origin: {term.origin_name} and Concept with nanoid: {concept.nanoid}")
+        attr_str = "{"
+        for key, val in attr_dict.items():
+            attr_str += f"{key}: '{val}', "
+        attr_str = attr_str.removesuffix(", ")
+        attr_str += "}"
 
-def link_two_terms(tx, term_1: Term, term_2: Term) -> None:
-    """
-    Link two Term nodes in the MDB via a Concept node.
+        if not output_str:
+            return attr_dict
+        return attr_str
 
-    This function takes two synonymous Terms as bento-meta objects and
-    ensures they are present in the MDB and connected to each other via
-    a Concept node and a 'represents' relationship.
-    """
-    if not (term_1.origin_name and term_1.value and
-            term_2.origin_name and term_2.value):
-        raise RuntimeError("args 'term_1' and 'term_2' must have both origin_name and value")
+    @write_txn
+    def detach_delete_entity(self, entity: Entity) -> tuple:
+        """
+        Remove given Entity node from the database.
 
-    term_1_exists = check_term_exists(tx, term_1)
-    term_2_exists = check_term_exists(tx, term_2)
+        Accepts the following bento-meta Entities:
+            Concept, Node, Predicate, Property, Edge, Term
+        """
+        entity_type = get_entity_type(entity)
+        entity_attr_str = self.get_entity_attrs(entity)
+        entity_attr_dict = self.get_entity_attrs(entity, output_str=False)
 
-    if term_1_exists and term_2_exists:
-        term_1_concepts = get_concepts(tx, term_1)
-        term_2_concepts = get_concepts(tx, term_2)
+        qry = (
+            f"MATCH (e:{entity_type} "
+            f"{entity_attr_str}) "
+            "DETACH DELETE e"
+        )
 
-        # Terms are already connected by a Concept
-        if not set(term_1_concepts).isdisjoint(set(term_2_concepts)):
-            existing_concept = set(term_1_concepts).intersection(set(term_2_concepts))
-            print(f"Both terms are already connected via Concept {list(existing_concept)[0]}")
+        print(f"Removing {entity_type} node with with properties: {entity_attr_str}")
+        return (qry, entity_attr_dict)
 
-        # Terms are not already connected by a Concept
-        elif set(term_1_concepts).isdisjoint(set(term_2_concepts)):
-            # One of Terms already has a represents Concept
-            if term_1_concepts:
-                existing_concept = Concept()
-                existing_concept.nanoid = term_1_concepts[0]
-                create_represents_relationship(tx, term_2, existing_concept)
-            elif term_2_concepts:
-                existing_concept = Concept()
-                existing_concept.nanoid = term_2_concepts[0]
-                create_represents_relationship(tx, term_1, existing_concept)
-            # Neither Term has an associated Concept
-            else:
-                new_concept = Concept()
-                new_concept.nanoid = make_nano()
-                create_concept(tx, new_concept)
-                create_represents_relationship(tx, term_1, new_concept)
-                create_represents_relationship(tx, term_2, new_concept)
+    @read_txn_value
+    def get_entity_count(self, entity: Entity) -> tuple:
+        """
+        Returns count of given entity (w/ its properties) found in MDB.
 
-    elif term_1_exists or term_2_exists:
-        if term_1_exists:
-            existing_term = term_1
-            new_term = term_2
+        If count = 0, entity with given properties not found in MDB.
+        If count = 1, entity with given properties is unique in MDB
+        If count > 1, more properties needed to uniquely id entity in MDB.
+        """
+        # if not (term.origin_name and term.value):
+        #     raise RuntimeError("arg 'term' must have both origin_name and value")
+        entity_type = get_entity_type(entity)
+        entity_attr_str = self.get_entity_attrs(entity)
+        entity_attr_dict = self.get_entity_attrs(entity, output_str=False)
+
+        qry = (
+            f"MATCH (e:{entity_type} {entity_attr_str}) "
+            "RETURN COUNT(e) as entity_count"
+        )
+
+        return (qry, entity_attr_dict, "entity_count")
+
+    @write_txn
+    def create_entity(
+        self,
+        entity: Entity
+        ) -> tuple:
+        """Adds given Entity node to database"""
+        if not entity.nanoid:
+            raise RuntimeError(
+                "Entity needs a nanoid before creating - please set valid entity nanoid. "
+                "my_entity.nanoid = my_mdb.get_or_make_nano(my_entity) AFTER "
+                "declaring some other entity properties is a good way to do this.")
+        # if not (term.origin_name and term.value):
+        #     raise RuntimeError("arg 'term' must have both origin_name and value")
+        # if not concept.nanoid:
+        #     raise RuntimeError("arg 'concept' must have nanoid")
+        # if not (predicate.handle and predicate.nanoid):
+        #     raise RuntimeError("arg 'predicate' must have both handle and nanoid")
+        # valid_predicate_handles = ['exactMatch', 'closeMatch', 'broader', 'narrower', 'related']
+        # if predicate.handle not in valid_predicate_handles:
+        #     raise RuntimeError(
+        #       f"'handle' key must be one the following: {valid_predicate_handles}")
+        entity_type = get_entity_type(entity)
+        entity_attr_str = self.get_entity_attrs(entity)
+        entity_attr_dict = self.get_entity_attrs(entity, output_str=False)
+
+        qry = (f"MERGE (e:{entity_type} {entity_attr_str})")
+
+        print(f"Creating new {entity_type} node with properties: {entity_attr_str}")
+        return (qry, entity_attr_dict)
+
+    @read_txn_value
+    def get_concepts(self, entity: Entity):
+        """Returns list of concepts represented by given entity"""
+        # if not (term.origin_name and term.value):
+        #     raise RuntimeError("arg 'term' must have both origin_name and value")
+        entity_type = get_entity_type(entity)
+        entity_attr_str = self.get_entity_attrs(entity)
+        entity_attr_dict = self.get_entity_attrs(entity, output_str=False)
+
+        if entity_type == "term":
+            qry = (
+                f"MATCH (e:{entity_type} {entity_attr_str}) "
+                "-[:represents]->(c:concept) RETURN c.nanoid AS concept"
+            )
         else:
-            existing_term = term_2
-            new_term = term_1
+            qry = (
+                f"MATCH (e:{entity_type} {entity_attr_str}) "
+                "-[:has_concept]->(c:concept) RETURN c.nanoid AS concept"
+            )
+        return (qry, entity_attr_dict, "concept")
 
-        existing_term_concepts = get_concepts(tx, existing_term)
+    @write_txn
+    def create_relationship(
+        self,
+        src_entity: Entity,
+        dst_entity: Entity,
+        relationship: str
+        ):
+        """Adds relationship between given entities in MDB"""
+        # gets number of entities in MDB matching given entity (w/ given properties)
+        ent_1_count = self.get_entity_count(src_entity)[0]
+        ent_2_count = self.get_entity_count(dst_entity)[0]
+        # at least one of the given entities doesn't uniquely id a node in the MDB.
+        if (ent_1_count > 1 or ent_2_count > 1):
+            raise RuntimeError(
+                "Given entities must uniquely identify nodes in the MDB. Please add "
+                "necessary properties to the entity so that it can be uniquely identified.")
+        # at least one of given entities not found and shouldn't be added
+        if (ent_1_count < 1 or ent_2_count < 1):
+            raise RuntimeError(
+                "One or more of the given entities aren't in the MDB.")
+        src_entity_type = get_entity_type(src_entity)
+        dst_entity_type = get_entity_type(dst_entity)
 
-        if existing_term_concepts:
-            create_term(tx, new_term)
-            existing_concept = Concept()
-            existing_concept.nanoid = existing_term_concepts[0]
-            create_represents_relationship(tx, new_term, existing_concept)
+        src_attr_str = self.get_entity_attrs(src_entity)
+        dst_attr_str = self.get_entity_attrs(dst_entity)
 
+        qry = (
+            "MATCH (s:{src_type} {{nanoid: '{src_nano}'}}), "
+            "(d:{dst_type} {{nanoid: '{dst_nano}'}}) "
+            "MERGE (s)-[:{relationship}]->(d)".format(
+                src_type=src_entity_type,
+                src_nano=src_entity.nanoid,
+                dst_type=dst_entity_type,
+                dst_nano=dst_entity.nanoid,
+                relationship=relationship
+            )
+        )
+
+        parms = {
+            "src_type": src_entity_type,
+            "src_nano": src_entity.nanoid,
+            "dst_type": dst_entity_type,
+            "dst_nano": dst_entity.nanoid,
+            "relationship": relationship
+        }
+        print(
+            f"Creating {relationship} relationship from src {src_entity_type} with "
+            f"properties: {src_attr_str} to dst {dst_entity_type} with properties: {dst_attr_str}"
+        )
+        return(qry, parms)
+
+    def link_synonyms(
+        self,
+        entity_1: Entity,
+        entity_2: Entity,
+        add_missing_ent: bool = False
+        ):
+        """
+        Link two synonymous entities in the MDB via a Concept node.
+
+        This function takes two synonymous Entities (as determined by user/SME) as
+        bento-meta objects connects them to a Concept node via a 'represents' relationship.
+
+        If one or both doesn't exist in the MDB and add_missing_ent is True they will be added.
+
+        If one or both doesn't uniquely identify a node in the MDB will give error.
+        """
+        # gets number of entities in MDB matching given entity (w/ given properties)
+        ent_1_count = self.get_entity_count(entity_1)[0]
+        ent_2_count = self.get_entity_count(entity_2)[0]
+        # at least one of the given entities doesn't uniquely id a node in the MDB.
+        if (ent_1_count > 1 or ent_2_count > 1):
+            raise RuntimeError(
+                "Given entities must uniquely identify nodes in the MDB. Please add "
+                "necessary properties to the entity so that it can be uniquely identified.")
+        # at least one of given entities not found and shouldn't be added
+        if ((ent_1_count < 1 or ent_2_count < 1) and not add_missing_ent):
+            raise RuntimeError(
+                "One or more of the given entities aren't in the MDB and add_missing_ent is False."
+                "Please add the missing entities to the MDB or set add_missing_ent to True.")
+        # entity 1 not found and should be added
+        if (not ent_1_count and add_missing_ent):
+            self.create_entity(entity_1)
+        # entity 2 not found and should be added
+        if (not ent_2_count and add_missing_ent):
+            self.create_entity(entity_2)
+        # get any existing concepts and create new concept if none found
+        ent_1_concepts = self.get_concepts(entity_1)
+        ent_2_concepts = self.get_concepts(entity_2)
+        if ent_1_concepts:
+            concept = Concept({"nanoid": ent_1_concepts[0]})
+        elif ent_2_concepts:
+            concept = Concept({"nanoid": ent_2_concepts[0]})
         else:
-            new_concept = Concept()
-            new_concept.nanoid = make_nano()
-            create_concept(tx, new_concept)
-            create_term(tx, new_term)
-            create_represents_relationship(tx, existing_term, new_concept)
-            create_represents_relationship(tx, new_term, new_concept)
+            concept = Concept({"nanoid": self.make_nano()})
+            self.create_entity(concept)
+        # entities are already connected by a concept
+        if not set(ent_1_concepts).isdisjoint(set(ent_2_concepts)):
+            concept = set(ent_1_concepts).intersection(set(ent_2_concepts))
+            print(f"Both terms are already connected via Concept {list(concept)[0]}")
+            return
+        # create specified relationship between each entity and a concept
+        if get_entity_type(entity_1) == "term":
+            self.create_relationship(entity_1, concept, "represents")
+            self.create_relationship(entity_2, concept, "represents")
+        else:
+            self.create_relationship(entity_1, concept, "has_concept")
+            self.create_relationship(entity_2, concept, "has_concept")
 
-    else:
-        create_term(tx, term_1)
-        create_term(tx, term_2)
-        new_concept = Concept()
-        new_concept.nanoid = make_nano()
-        create_concept(tx, new_concept)
-        create_represents_relationship(tx, term_1, new_concept)
-        create_represents_relationship(tx, term_2, new_concept)
+    def make_nano(self):
+        """Generates valid nanoid"""
+        return generate(
+            size=6,
+            alphabet="abcdefghijkmnopqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ0123456789"
+        )
 
-def create_predicate(tx, predicate: Predicate) -> None:
-    """Adds given Predicate node to database"""
-    if not (predicate.handle and predicate.nanoid):
-        raise RuntimeError("arg 'predicate' must have both handle and nanoid")
-    valid_predicate_handles = ['exactMatch', 'closeMatch', 'broader', 'narrower', 'related']
-    if predicate.handle not in valid_predicate_handles:
-        raise RuntimeError(f"'handle' key must be one the following: {valid_predicate_handles}")
-    tx.run("MERGE (p:predicate {handle: $predicate_handle, nanoid: $predicate_nanoid})",
+    def get_or_make_nano(
+        self,
+        entity: Entity,
+        extra_handle_1: str = "",
+        extra_handle_2: str = ""
+        ) -> str:
+        """Obtains existing entity's nanoid or creates one for new entity."""
+        nano_list = self.get_entity_nano(entity, extra_handle_1, extra_handle_2)
+        if len(nano_list) > 1:
+            raise RuntimeError(
+                "More than one entity exists with these properties. Please "
+                "add more properties of the desired entity to uniquely ID.")
+        elif nano_list and not nano_list[0]:
+            raise RuntimeError(
+                "An entity with these properties exists in the MDB but doesn't "
+                "have an assigned nanoid for some reason.")
+        elif nano_list:
+            nano = nano_list[0]
+            return nano
+        nano = self.make_nano()
+        return nano
+
+    # update otw
+    def create_subject_relationship(self, tx, concept: Concept, predicate: Predicate) -> None:
+        """Adds has_subject relationship to given Concept from given Predicate node"""
+        if not (predicate.handle and predicate.nanoid):
+            raise RuntimeError("arg 'predicate' must have both handle and nanoid")
+        if not concept.nanoid:
+            raise RuntimeError("arg 'concept' must have nanoid")
+        tx.run("MATCH (c:concept {nanoid: $concept_nanoid}), "
+            "(p:predicate {handle: $predicate_handle, nanoid: $predicate_nanoid}) "
+            "MERGE (p)-[:has_subject]->(c)",
+            concept_nanoid=concept.nanoid,
             predicate_handle=predicate.handle, predicate_nanoid=predicate.nanoid)
-    print(f"Created new Predicate with handle: {predicate.handle} and nanoid: {predicate.nanoid}")
+        print("Created has_subject relationship between source Predicate with handle: "
+            f"{predicate.handle} and nanoid: {predicate.nanoid} and destination Concept "
+            f"with nanoid: {concept.nanoid}")
 
-def create_subject_relationship(tx, concept: Concept, predicate: Predicate) -> None:
-    """Adds has_subject relationship to given Concept from given Predicate node"""
-    if not (predicate.handle and predicate.nanoid):
-        raise RuntimeError("arg 'predicate' must have both handle and nanoid")
-    if not concept.nanoid:
-        raise RuntimeError("arg 'concept' must have nanoid")
-    tx.run("MATCH (c:concept {nanoid: $concept_nanoid}), "
-        "(p:predicate {handle: $predicate_handle, nanoid: $predicate_nanoid}) "
-        "MERGE (p)-[:has_subject]->(c)",
-        concept_nanoid=concept.nanoid,
-        predicate_handle=predicate.handle, predicate_nanoid=predicate.nanoid)
-    print("Created has_subject relationship between source Predicate with handle: "
-        f"{predicate.handle} and nanoid: {predicate.nanoid} and destination Concept "
-        f"with nanoid: {concept.nanoid}")
+    # update otw
+    def create_object_relationship(self, tx, concept: Concept, predicate: Predicate) -> None:
+        """Adds has_subject relationship to given Concept from given Predicate node"""
+        if not (predicate.handle and predicate.nanoid):
+            raise RuntimeError("arg 'predicate' must have both handle and nanoid")
+        if not concept.nanoid:
+            raise RuntimeError("arg 'concept' must have nanoid")
+        tx.run("MATCH (c:concept {nanoid: $concept_nanoid}), "
+            "(p:predicate {handle: $predicate_handle, nanoid: $predicate_nanoid}) "
+            "MERGE (p)-[:has_object]->(c)",
+            concept_nanoid=concept.nanoid,
+            predicate_handle=predicate.handle, predicate_nanoid=predicate.nanoid)
+        print("Created has_object relationship between source Predicate with handle: "
+            f"{predicate.handle} and nanoid: {predicate.nanoid} and destination Concept "
+            f"with nanoid: {concept.nanoid}")
 
-def create_object_relationship(tx, concept: Concept, predicate: Predicate) -> None:
-    """Adds has_subject relationship to given Concept from given Predicate node"""
-    if not (predicate.handle and predicate.nanoid):
-        raise RuntimeError("arg 'predicate' must have both handle and nanoid")
-    if not concept.nanoid:
-        raise RuntimeError("arg 'concept' must have nanoid")
-    tx.run("MATCH (c:concept {nanoid: $concept_nanoid}), "
-        "(p:predicate {handle: $predicate_handle, nanoid: $predicate_nanoid}) "
-        "MERGE (p)-[:has_object]->(c)",
-        concept_nanoid=concept.nanoid,
-        predicate_handle=predicate.handle, predicate_nanoid=predicate.nanoid)
-    print("Created has_object relationship between source Predicate with handle: "
-        f"{predicate.handle} and nanoid: {predicate.nanoid} and destination Concept "
-        f"with nanoid: {concept.nanoid}")
+    # update otw
+    def get_terms(self, tx, concept: Concept) -> list[Term]:
+        """Returns list of Term nodes representing given Concept"""
+        if not concept.nanoid:
+            raise RuntimeError("arg 'concept' must have nanoid")
+        terms = []
+        result = tx.run("MATCH (t:term)-[:represents]->(c:concept {nanoid: $concept_nanoid}) "
+                        "RETURN t.value AS term_val, t.origin_name AS term_origin",
+                        concept_nanoid=concept.nanoid)
+        for record in result:
+            terms.append(Term({"value": record["term_val"], "origin_name": record["term_origin"]}))
+        return terms
 
-def get_terms(tx, concept: Concept) -> list[Term]:
-    """Returns list of Term nodes representing given Concept"""
-    if not concept.nanoid:
-        raise RuntimeError("arg 'concept' must have nanoid")
-    terms = []
-    result = tx.run("MATCH (t:term)-[:represents]->(c:concept {nanoid: $concept_nanoid}) "
-                    "RETURN t.value AS term_val, t.origin_name AS term_origin",
-                    concept_nanoid=concept.nanoid)
-    for record in result:
-        terms.append(Term({"value": record["term_val"], "origin_name": record["term_origin"]}))
-    return terms
+    # update otw
+    def get_predicates(self, tx, concept: Concept) -> list[list]:
+        """Returns list of Predicate nodes with relationship to given Concept"""
+        if not concept.nanoid:
+            raise RuntimeError("arg 'concept' must have nanoid")
+        preds = []
+        result = tx.run("MATCH (p:predicate)-[r]->(c:concept {nanoid: $concept_nanoid}) "
+                        "RETURN p.handle AS pred_handle, p.nanoid AS pred_nano, type(r) as edge",
+                        concept_nanoid=concept.nanoid)
+        for record in result:
+            preds.append(
+                [Predicate({"handle": record["pred_handle"],
+                            "nanoid": record["pred_nano"]}),
+                record["edge"]]
+                )
+        return preds
 
-def get_predicates(tx, concept: Concept) -> list[list]:
-    """Returns list of Predicate nodes with relationship to given Concept"""
-    if not concept.nanoid:
-        raise RuntimeError("arg 'concept' must have nanoid")
-    preds = []
-    result = tx.run("MATCH (p:predicate)-[r]->(c:concept {nanoid: $concept_nanoid}) "
-                    "RETURN p.handle AS pred_handle, p.nanoid AS pred_nano, type(r) as edge",
-                    concept_nanoid=concept.nanoid)
-    for record in result:
-        preds.append([Predicate({"handle": record["pred_handle"], "nanoid": record["pred_nano"]}),
-                    record["edge"]])
-    return preds
+    # update otw
+    def link_concepts_to_predicate(self, tx, concept_1: Concept, concept_2: Concept,
+                                    predicate_handle: str = "exactMatch") -> None:
+        """
+        Links two synonymous Concepts via a Predicate
 
-def detach_delete_predicate(tx, predicate: Predicate) -> None:
-    """Remove given Predicate node from database"""
-    if not (predicate.handle and predicate.nanoid):
-        raise RuntimeError("arg 'predicate' must have both handle and nanoid")
-    tx.run("match (p:predicate {handle: $predicate_handle, nanoid: $predicate_nanoid})"
-            "detach delete p", predicate_handle=predicate.handle, predicate_nanoid=predicate.nanoid)
-    print(f"Removed Predicate node with handle: {predicate.handle} and nanoid: {predicate.nanoid}")
+        This function takes two synonymous Concepts as objects and links
+        them via a Predicate node and has_subject and has_object relationships.
+        """
 
-def detach_delete_concept(tx, concept: Concept) -> None:
-    """Remove given Concept node from database"""
-    if not concept.nanoid:
-        raise RuntimeError("arg 'concept' must have nanoid")
-    tx.run("match (c:concept {nanoid: $nanoid})"
-            "detach delete c", nanoid=concept.nanoid)
-    print(f"Removed Concept node with nanoid: {concept.nanoid}")
+        if not (concept_1.nanoid and concept_2.nanoid):
+            raise RuntimeError("args 'concept_1' and 'concept_2' must have nanoid")
 
-def detach_delete_term(tx, term: Term) -> None:
-    """Remove given Term node from database"""
-    if not (term.origin_name and term.value):
-        raise RuntimeError("arg 'term' must have both origin_name and value")
-    tx.run("match (t:term {value: $term_val, origin_name: $term_origin})"
-            "detach delete t", term_val=term.value, term_origin=term.origin_name)
-    print(f"Removed Term node with value: {term.value} and origin: {term.origin_name}")
+        # create predicate
+        new_predicate = Predicate()
+        new_predicate.handle = predicate_handle
+        new_predicate.nanoid = self.make_nano()
+        self.create_entity(new_predicate)
 
-def link_concepts_to_predicate(tx, concept_1: Concept, concept_2: Concept,
-                                predicate_handle: str = "exactMatch") -> None:
-    """
-    Links two synonymous Concepts via a Predicate
+        # link concepts to predicate via subject & object relationships
+        self.create_subject_relationship(tx, concept_1, new_predicate)
+        self.create_object_relationship(tx, concept_2, new_predicate)
 
-    This function takes two synonymous Concepts as objects and links
-    them via a Predicate node and has_subject and has_object relationships.
-    """
+    #update otw
+    def merge_two_concepts(self, tx, concept_1: Concept, concept_2: Concept) -> None:
+        """
+        Combine two synonymous Concepts into a single Concept.
 
-    if not (concept_1.nanoid and concept_2.nanoid):
-        raise RuntimeError("args 'concept_1' and 'concept_2' must have nanoid")
+        This function takes two synonymous Concept as bento-meta objects and
+        merges them into a single Concept along with any connected Terms and Predicates.
+        """
+        if not (concept_1.nanoid and concept_2.nanoid):
+            raise RuntimeError("args 'concept_1' and 'concept_2' must have nanoid")
 
-    # create predicate
-    new_predicate = Predicate()
-    new_predicate.handle = predicate_handle
-    new_predicate.nanoid = make_nano()
-    create_predicate(tx, new_predicate)
+        # get list of all terms connected to concept 2
+        c2_terms = self.get_terms(tx, concept_2)
+        # get list of all predicates connected to concept 2
+        c2_preds = self.get_predicates(tx, concept_2)
+        # delete concept 2
+        self.detach_delete_entity(concept_2)
+        # connect terms from deleted (c2) to remaining concept (c1)
+        for term in c2_terms:
+            self.create_relationship(term, concept_1, "represents")
+        # connect predicates from deleted (c2) to remaining concept (c1)
+        for pred in c2_preds:
+            c2_edge = pred[1]
+            c2_pred = Predicate({"handle": pred[0].handle, "nanoid": pred[0].nanoid})
+            if c2_edge == "has_object":
+                self.create_object_relationship(tx, concept_1, c2_pred)
+            elif c2_edge == "has_subject":
+                self.create_subject_relationship(tx, concept_1, c2_pred)
 
-    # link concepts to predicate via subject & object relationships
-    create_subject_relationship(tx, concept_1, new_predicate)
-    create_object_relationship(tx, concept_2, new_predicate)
+    # update otw
+    def get_term_synonyms(self, tx, term: Term, threshhold: float = 0.8) -> list[dict]:
+        """Returns list of dicts representing Term nodes synonymous to given Term"""
+        if not (term.origin_name and term.value):
+            raise RuntimeError("arg 'term' must have both origin_name and value")
 
-def merge_two_concepts(tx, concept_1: Concept, concept_2: Concept) -> None:
-    """
-    Combine two synonymous Concepts into a single Concept.
+        # load spaCy NER model
+        nlp = en_ner_bionlp13cg_md.load()
 
-    This function takes two synonymous Concept as bento-meta objects and
-    merges them into a single Concept along with any connected Terms and Predicates.
-    """
-    if not (concept_1.nanoid and concept_2.nanoid):
-        raise RuntimeError("args 'concept_1' and 'concept_2' must have nanoid")
+        synonyms = []
+        result = tx.run("MATCH (t:term) "
+                        "RETURN t.value AS term_val, t.origin_name AS term_origin")
+        for record in result:
+            # calculate similarity between each Term and input Term
+            term_1 = nlp(term.value)
+            term_2 = nlp(str(record["term_val"]))
+            similarity = term_1.similarity(term_2)
+            # if similarity threshold met, add to list of potential synonyms
+            if similarity >= threshhold:
+                synonym = {
+                    "value": record["term_val"],
+                    "origin_name": record["term_origin"],
+                    "similarity": similarity,
+                    "valid_synonym": 0 # mark 1 if synonym when uploading later
+                }
+                synonyms.append(synonym)
+        synonyms_sorted = sorted(synonyms, key=lambda d: d["similarity"], reverse=True)
+        return synonyms_sorted
 
-    # get list of all terms connected to concept 2
-    c2_terms = get_terms(tx, concept_2)
-    # get list of all predicates connected to concept 2
-    c2_preds = get_predicates(tx, concept_2)
-    # delete concept 2
-    detach_delete_concept(tx, concept_2)
-    # connect terms from deleted (c2) to remaining concept (c1)
-    for term in c2_terms:
-        create_represents_relationship(tx, term, concept_1)
-    # connect predicates from deleted (c2) to remaining concept (c1)
-    for pred in c2_preds:
-        c2_edge = pred[1]
-        c2_pred = Predicate({"handle": pred[0].handle, "nanoid": pred[0].nanoid})
-        if c2_edge == "has_object":
-            create_object_relationship(tx, concept_1, c2_pred)
-        elif c2_edge == "has_subject":
-            create_subject_relationship(tx, concept_1, c2_pred)
+    # update otw
+    def potential_synonyms_to_csv(self, input_data: list[dict], output_path: str) -> None:
+        """Given a list of synonymous Terms as dicts, outputs to CSV file at given output path"""
+        with open(output_path, "w", encoding="utf8", newline="") as output_file:
+            dict_writer = csv.DictWriter(output_file,
+                                        fieldnames=input_data[0].keys())
+            dict_writer.writeheader()
+            dict_writer.writerows(input_data)
 
-def get_term_synonyms(tx, term: Term, threshhold: float = 0.8) -> list[dict]:
-    """Returns list of dicts representing Term nodes synonymous to given Term"""
-    if not (term.origin_name and term.value):
-        raise RuntimeError("arg 'term' must have both origin_name and value")
+    # update otw
+    def link_term_synonyms_csv(self, term: Term, csv_path: str) -> None:
+        """Given a CSV of syonymous Terms, links each via a Concept node to given Term"""
+        with open(csv_path, encoding="UTF-8") as csvfile:
+            synonym_reader = csv.reader(csvfile)
+            for line in synonym_reader:
+                if line[3] == "1":
+                    synonym = Term()
+                    synonym.value = line[0]
+                    synonym.origin_name = line[1]
+                    self.link_synonyms(term, synonym)
 
-    # load spaCy NER model
-    nlp = en_ner_bionlp13cg_md.load()
+    def _get_prop_nano(self, prop: Entity, node_handle: str):
+        """
+        Takes Property and Node entities and returns Property nanoid.
 
-    synonyms = []
-    result = tx.run("MATCH (t:term) "
-                    "RETURN t.value AS term_val, t.origin_name AS term_origin")
-    for record in result:
-        # calculate similarity between each Term and input Term
-        term_1 = nlp(term.value)
-        term_2 = nlp(str(record["term_val"]))
-        similarity = term_1.similarity(term_2)
-        # if similarity threshold met, add to list of potential synonyms
-        if similarity >= threshhold:
-            synonym = {
-                "value": record["term_val"],
-                "origin_name": record["term_origin"],
-                "similarity": similarity,
-                "valid_synonym": 0 # 0 for now when downloading; mark 1 if synonym when uploading
-            }
-            synonyms.append(synonym)
-    synonyms_sorted = sorted(synonyms, key=lambda d: d["similarity"], reverse=True)
-    return synonyms_sorted
+        This is used to help uniquely identify a property node in the MDB,
+        which requires a node connected via the has_property relationship.
+        """
+        qry = (
+            "MATCH (p:property {handle: $prop_handle, model: $prop_model})"
+            "<-[:has_property]-(n:node {handle: $node_handle}) "
+            "RETURN p.nanoid as prop_nano"
+        )
+        parms = {
+            "prop_handle": prop.handle,
+            "prop_model": prop.model,
+            "node_handle": node_handle
+        }
+        return(qry, parms, "prop_nano")
 
-def potential_synonyms_to_csv(input_data: list[dict], output_path: str) -> None:
-    """Given a list of synonymous Terms as dicts, outputs to CSV file at given output path"""
-    with open(output_path, "w", encoding="utf8", newline="") as output_file:
-        dict_writer = csv.DictWriter(output_file,
-                                    fieldnames=input_data[0].keys())
-        dict_writer.writeheader()
-        dict_writer.writerows(input_data)
+    def _get_edge_nano(self, edge: Entity, src_handle: str, dst_handle: str):
+        """
+        Takes Edge, src node handle, and dst Node handle and returns Edge nanoid.
 
-def link_term_synonyms_csv(tx, term: Term, csv_path: str) -> None:
-    """Given a CSV of syonymous Terms, links each via a Concept node to given Term"""
-    with open(csv_path, encoding="UTF-8") as csvfile:
-        synonym_reader = csv.reader(csvfile)
-        for line in synonym_reader:
-            if line[3] == "1":
-                synonym = Term()
-                synonym.value = line[0]
-                synonym.origin_name = line[1]
-                link_two_terms(tx, term, synonym)
+        This is used to help uniquely identify an edge node in the MDB,
+        which requires nodes connected via the has_src and has_dst relationships.
+        """
+        qry = (
+            "MATCH (s:node {handle: $src_handle})<-[:has_src]-"
+            "(r:relationship {handle: $edge_handle, model: $edge_model})-"
+            "[:has_dst]->(d:node {handle: $dst_handle}) "
+            "RETURN r.nanoid as edge_nano"
+        )
+        parms = {
+            "edge_handle": edge.handle,
+            "edge_model": edge.model,
+            "src_handle": src_handle,
+            "dst_handle": dst_handle
+        }
+        return(qry, parms, "edge_nano")
+
+    @read_txn_value
+    def get_entity_nano(
+        self,
+        entity: Entity,
+        extra_handle_1: str = "",
+        extra_handle_2: str = ""
+        ) -> tuple:
+        """
+        Takes an entity and returns its nanoid. If entity requires handles of connected nodes
+        for unique identification (Property or Edge), extra_handle_1 and _2 hold these as str.
+
+        Note: If an entity exists in the MDB with the given properties, but doesn't have an
+        assigned nanoid for some reason, returns [None] instead of [].
+        """
+        ent_type = get_entity_type(entity)
+        if ent_type == "property":
+            if not extra_handle_1:
+                raise RuntimeError(
+                    "Property entities require the handle of a node connected via 'has_property' "
+                    "for unique identification. Set 'extra_handle_1' to that node handle str.")
+            return self._get_prop_nano(prop=entity, node_handle=extra_handle_1)
+        if ent_type == "relationship":
+            if (not extra_handle_1 or not extra_handle_2):
+                raise RuntimeError(
+                    "Edge entities require the handles of a node connected via "
+                    "'has_src' relationship and of a node connected via 'has_dst' "
+                    "relationship for unique identification. Set 'extra_handle_1' to "
+                    "the src handle and 'extra_handle_2' to the dst handle")
+            return self._get_edge_nano(
+                edge=entity, src_handle=extra_handle_1, dst_handle=extra_handle_2)
+
+        ent_count = self.get_entity_count(entity)[0]
+        if ent_count > 1:
+            raise RuntimeError(
+                    "Given entities must uniquely identify nodes in the MDB. Please add "
+                    "necesary properties to the entity so that it can be uniquely identified.")
+        # if ent_count < 1:
+        #     raise RuntimeError("Given entity wasn't found in the MDB")
+
+        ent_attr_str = self.get_entity_attrs(entity)
+        ent_attr_dict = self.get_entity_attrs(entity, output_str=False)
+
+        qry = (
+            f"MATCH (e:{ent_type} {ent_attr_str}) "
+            "RETURN e.nanoid as ent_nano"
+        )
+
+        return(qry, ent_attr_dict, "ent_nano")

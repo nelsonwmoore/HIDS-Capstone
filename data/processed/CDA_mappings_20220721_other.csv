@@ -1,0 +1,30 @@
+model_1,prop_handle_1,node_handle_1,model_2,prop_handle_2,node_handle_2
+CDA,identifier.system,subject,GDC,GDC,GDC
+CDA,species,subject,GDC,Homo sapiens,Homo sapiens
+CDA,identifier.system,subject,PDC,PDC,PDC
+CDA,identifier.system,subject,IDC,IDC,IDC
+CDA,identifier.system,researchsubject,GDC,GDC,GDC
+CDA,identifier.system,researchsubject,PDC,PDC,PDC
+CDA,identifier.system,researchsubject,IDC,IDC,IDC
+CDA,identifier.system,diagnosis,GDC,GDC,GDC
+CDA,identifier.system,diagnosis,PDC,PDC,PDC
+CDA,identifier.system,treatment,GDC,GDC,GDC
+CDA,identifier.system,treatment,PDC,PDC,PDC
+CDA,id,specimen,GDC,"{'samples': 'files.cases.samples.sample_id', 'portions': 'files.cases.samples.portions.portion_id', 'slides': 'files.cases.samples.portions.slides.slide_id', 'analytes': 'files.cases.samples.portions.analytes.analyte_id', 'aliquots': 'files.cases.samples.portions.analytes.aliquots.aliquot_id'}","{'samples': 'files.cases.samples.sample_id', 'portions': 'files.cases.samples.portions.portion_id', 'slides': 'files.cases.samples.portions.slides.slide_id', 'analytes': 'files.cases.samples.portions.analytes.analyte_id', 'aliquots': 'files.cases.samples.portions.analytes.aliquots.aliquot_id'}"
+CDA,identifier.system,specimen,GDC,GDC,GDC
+CDA,identifier.value,specimen,GDC,"{'samples': 'files.cases.samples.sample_id', 'portions': 'files.cases.samples.portions.portion_id', 'slides': 'files.cases.samples.portions.slides.slide_id', 'analytes': 'files.cases.samples.portions.analytes.analyte_id', 'aliquots': 'files.cases.samples.portions.analytes.aliquots.aliquot_id'}","{'samples': 'files.cases.samples.sample_id', 'portions': 'files.cases.samples.portions.portion_id', 'slides': 'files.cases.samples.portions.slides.slide_id', 'analytes': 'files.cases.samples.portions.analytes.analyte_id', 'aliquots': 'files.cases.samples.portions.analytes.aliquots.aliquot_id'}"
+CDA,specimen_type,specimen,GDC,"{'samples': 'sample', 'portions': 'portion', 'slides': 'slide', 'analytes': 'analyte', 'aliquots': 'aliquot'}","{'samples': 'sample', 'portions': 'portion', 'slides': 'slide', 'analytes': 'analyte', 'aliquots': 'aliquot'}"
+CDA,derived_from_specimen,specimen,GDC,"{'samples': 'initial specimen', 'portions': 'files.cases.samples.sample_id', 'slides': 'files.cases.samples.portions.portion_id', 'analytes': 'files.cases.samples.portions.portion_id', 'aliquots': 'files.cases.samples.portions.analytes.analyte_id'}","{'samples': 'initial specimen', 'portions': 'files.cases.samples.sample_id', 'slides': 'files.cases.samples.portions.portion_id', 'analytes': 'files.cases.samples.portions.portion_id', 'aliquots': 'files.cases.samples.portions.analytes.analyte_id'}"
+CDA,id,specimen,PDC,"{'samples': 'files.cases.samples.sample_id', 'aliquots': 'files.cases.samples.aliquots.aliquot_id'}","{'samples': 'files.cases.samples.sample_id', 'aliquots': 'files.cases.samples.aliquots.aliquot_id'}"
+CDA,identifier.system,specimen,PDC,PDC,PDC
+CDA,identifier.value,specimen,PDC,"{'samples': 'files.cases.samples.sample_id', 'aliquots': 'files.cases.samples.aliquots.aliquot_id'}","{'samples': 'files.cases.samples.sample_id', 'aliquots': 'files.cases.samples.aliquots.aliquot_id'}"
+CDA,specimen_type,specimen,PDC,"{'samples': 'sample', 'aliquots': 'aliquot'}","{'samples': 'sample', 'aliquots': 'aliquot'}"
+CDA,derived_from_specimen,specimen,PDC,"{'samples': 'initial specimen', 'aliquots': 'files.cases.samples.sample_id'}","{'samples': 'initial specimen', 'aliquots': 'files.cases.samples.sample_id'}"
+CDA,identifier.system,file,GDC,GDC,GDC
+CDA,data_modality,file,GDC,Genomic,Genomic
+CDA,identifier.system,file,PDC,PDC,PDC
+CDA,data_modality,file,PDC,Proteomic,Proteomic
+CDA,identifier.system,file,IDC,IDC,IDC
+CDA,data_category,file,IDC,Imaging,Imaging
+CDA,file_format,file,IDC,DICOM,DICOM
+CDA,data_modality,file,IDC,Imaging,Imaging
