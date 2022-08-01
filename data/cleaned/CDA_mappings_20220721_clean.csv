@@ -1,0 +1,119 @@
+model_1,prop_handle_1,node_handle_1,model_2,prop_handle_2,node_handle_2
+CDA,id,subject,GDC,submitter_id,"['files', 'cases']"
+CDA,identifier,subject,GDC,submitter_id,"['files', 'cases']"
+CDA,sex,subject,GDC,gender,"['files', 'cases', 'demographic']"
+CDA,race,subject,GDC,race,"['files', 'cases', 'demographic']"
+CDA,ethnicity,subject,GDC,ethnicity,"['files', 'cases', 'demographic']"
+CDA,days_to_birth,subject,GDC,days_to_birth,"['files', 'cases', 'demographic']"
+CDA,subject_associated_project,subject,GDC,project_id,"['files', 'cases', 'project']"
+CDA,vital_status,subject,GDC,vital_status,"['files', 'cases', 'demographic']"
+CDA,days_to_death,subject,GDC,days_to_death,"['files', 'cases', 'demographic']"
+CDA,cause_of_death,subject,GDC,cause_of_death,"['files', 'cases', 'demographic']"
+CDA,id,subject,PDC,case_submitter_id,"['files', 'cases']"
+CDA,identifier,subject,PDC,case_submitter_id,"['files', 'cases']"
+CDA,species,subject,PDC,taxon,"['files', 'cases']"
+CDA,sex,subject,PDC,gender,"['files', 'cases', 'demographics']"
+CDA,race,subject,PDC,race,"['files', 'cases', 'demographics']"
+CDA,ethnicity,subject,PDC,ethnicity,"['files', 'cases', 'demographics']"
+CDA,days_to_birth,subject,PDC,days_to_birth,"['files', 'cases', 'demographics']"
+CDA,subject_associated_project,subject,PDC,project_submitter_id,"['files', 'cases']"
+CDA,vital_status,subject,PDC,vital_status,"['cases', 'demographics']"
+CDA,days_to_death,subject,PDC,days_to_death,"['files', 'cases', 'demographics']"
+CDA,cause_of_death,subject,PDC,cause_of_death,"['files', 'cases', 'demographics']"
+CDA,id,subject,IDC,PatientID,['files']
+CDA,identifier,subject,IDC,PatientID,['files']
+CDA,species,subject,IDC,tcia_species,['files']
+CDA,subject_associated_project,subject,IDC,collection_id,['files']
+CDA,id,researchsubject,GDC,case_id,"['files', 'cases']"
+CDA,identifier,researchsubject,GDC,case_id,"['files', 'cases']"
+CDA,member_of_research_project,researchsubject,GDC,project_id,"['files', 'cases', 'project']"
+CDA,primary_diagnosis_condition,researchsubject,GDC,disease_type,"['files', 'cases']"
+CDA,primary_diagnosis_site,researchsubject,GDC,primary_site,"['files', 'cases']"
+CDA,id,researchsubject,PDC,case_id,"['files', 'cases']"
+CDA,identifier,researchsubject,PDC,case_id,"['files', 'cases']"
+CDA,member_of_research_project,researchsubject,PDC,project_submitter_id,"['files', 'cases']"
+CDA,primary_diagnosis_condition,researchsubject,PDC,disease_type,"['files', 'cases']"
+CDA,primary_diagnosis_site,researchsubject,PDC,primary_site,"['files', 'cases']"
+CDA,id,researchsubject,IDC,PatientID,['files']
+CDA,identifier,researchsubject,IDC,PatientID,['files']
+CDA,member_of_research_project,researchsubject,IDC,collection_id,['files']
+CDA,primary_diagnosis_site,researchsubject,IDC,tcia_tumorLocation,['files']
+CDA,id,diagnosis,GDC,diagnosis_id,"['files', 'cases', 'diagnoses']"
+CDA,identifier,diagnosis,GDC,diagnosis_id,"['files', 'cases', 'diagnoses']"
+CDA,primary_diagnosis,diagnosis,GDC,primary_diagnosis,"['files', 'cases', 'diagnoses']"
+CDA,age_at_diagnosis,diagnosis,GDC,age_at_diagnosis,"['files', 'cases', 'diagnoses']"
+CDA,morphology,diagnosis,GDC,morphology,"['files', 'cases', 'diagnoses']"
+CDA,stage,diagnosis,GDC,tumor_stage,"['files', 'cases', 'diagnoses']"
+CDA,grade,diagnosis,GDC,tumor_grade,"['files', 'cases', 'diagnoses']"
+CDA,method_of_diagnosis,diagnosis,GDC,method_of_diagnosis,"['files', 'cases', 'diagnoses']"
+CDA,id,diagnosis,PDC,diagnosis_id,"['files', 'cases', 'diagnoses']"
+CDA,identifier,diagnosis,PDC,diagnosis_id,"['files', 'cases', 'diagnoses']"
+CDA,primary_diagnosis,diagnosis,PDC,primary_diagnosis,"['files', 'cases', 'diagnoses']"
+CDA,age_at_diagnosis,diagnosis,PDC,age_at_diagnosis,"['files', 'cases', 'diagnoses']"
+CDA,morphology,diagnosis,PDC,morphology,"['files', 'cases', 'diagnoses']"
+CDA,stage,diagnosis,PDC,tumor_stage,"['files', 'cases', 'diagnoses']"
+CDA,grade,diagnosis,PDC,tumor_grade,"['files', 'cases', 'diagnoses']"
+CDA,method_of_diagnosis,diagnosis,PDC,method_of_diagnosis,"['files', 'cases', 'diagnoses']"
+CDA,id,treatment,GDC,treatment_id,"['files', 'cases', 'diagnoses', 'treatments']"
+CDA,identifier,treatment,GDC,treatment_id,"['files', 'cases', 'diagnoses', 'treatments']"
+CDA,treatment_type,treatment,GDC,treatment_type,"['files', 'cases', 'diagnoses', 'treatments']"
+CDA,treatment_outcome,treatment,GDC,treatment_outcome,"['files', 'cases', 'diagnoses', 'treatments']"
+CDA,days_to_treatment_start,treatment,GDC,days_to_treatment_start,"['files', 'cases', 'diagnoses', 'treatments']"
+CDA,days_to_treatment_end,treatment,GDC,days_to_treatment_end,"['files', 'cases', 'diagnoses', 'treatments']"
+CDA,therapeutic_agent,treatment,GDC,therapeutic_agents,"['files', 'cases', 'diagnoses', 'treatments']"
+CDA,treatment_anatomic_site,treatment,GDC,treatment_anatomic_site,"['files', 'cases', 'diagnoses', 'treatments']"
+CDA,treatment_effect,treatment,GDC,treatment_effect,"['files', 'cases', 'diagnoses', 'treatments']"
+CDA,treatment_end_reason,treatment,GDC,reason_treatment_ended,"['files', 'cases', 'diagnoses', 'treatments']"
+CDA,number_of_cycles,treatment,GDC,number_of_cycles,"['files', 'cases', 'diagnoses', 'treatments']"
+CDA,id,treatment,PDC,treatment_id,"['files', 'cases', 'diagnoses', 'treatments']"
+CDA,identifier,treatment,PDC,treatment_id,"['files', 'cases', 'diagnoses', 'treatments']"
+CDA,treatment_type,treatment,PDC,treatment_type,"['files', 'cases', 'diagnoses', 'treatments']"
+CDA,treatment_outcome,treatment,PDC,treatment_outcome,"['files', 'cases', 'diagnoses', 'treatments']"
+CDA,days_to_treatment_start,treatment,PDC,days_to_treatment_start,"['files', 'cases', 'diagnoses', 'treatments']"
+CDA,days_to_treatment_end,treatment,PDC,days_to_treatment_end,"['files', 'cases', 'diagnoses', 'treatments']"
+CDA,therapeutic_agent,treatment,PDC,therapeutic_agents,"['files', 'cases', 'diagnoses', 'treatments']"
+CDA,treatment_anatomic_site,treatment,PDC,treatment_anatomic_site,"['files', 'cases', 'diagnoses', 'treatments']"
+CDA,treatment_effect,treatment,PDC,treatment_effect,"['files', 'cases', 'diagnoses', 'treatments']"
+CDA,treatment_end_reason,treatment,PDC,reason_treatment_ended,"['files', 'cases', 'diagnoses', 'treatments']"
+CDA,number_of_cycles,treatment,PDC,number_of_cycles,"['files', 'cases', 'diagnoses', 'treatments']"
+CDA,associated_project,specimen,GDC,project_id,"['files', 'cases', 'project']"
+CDA,days_to_collection,specimen,GDC,days_to_sample_procurement,"['files', 'cases', 'samples']"
+CDA,primary_disease_type,specimen,GDC,disease_type,"['files', 'cases']"
+CDA,anatomical_site,specimen,GDC,biospecimen_anatomic_site,"['files', 'cases', 'samples']"
+CDA,source_material_type,specimen,GDC,sample_type,"['files', 'cases', 'samples']"
+CDA,derived_from_subject,specimen,GDC,submitter_id,"['files', 'cases']"
+CDA,associated_project,specimen,PDC,project_submitter_id,"['files', 'cases']"
+CDA,days_to_collection,specimen,PDC,days_to_sample_procurement,"['files', 'cases', 'samples']"
+CDA,primary_disease_type,specimen,PDC,disease_type,"['files', 'cases']"
+CDA,anatomical_site,specimen,PDC,biospecimen_anatomic_site,"['files', 'cases', 'samples']"
+CDA,source_material_type,specimen,PDC,sample_type,"['files', 'cases', 'samples']"
+CDA,derived_from_subject,specimen,PDC,case_submitter_id,"['files', 'cases']"
+CDA,id,file,GDC,file_id,['files']
+CDA,identifier,file,GDC,file_id,['files']
+CDA,label,file,GDC,file_name,['files']
+CDA,data_category,file,GDC,data_category,['files']
+CDA,data_type,file,GDC,data_type,['files']
+CDA,file_format,file,GDC,data_format,['files']
+CDA,associated_project,file,GDC,project_id,"['files', 'cases', 'project']"
+CDA,drs_uri,file,GDC,file_id,['files']
+CDA,byte_size,file,GDC,file_size,['files']
+CDA,checksum,file,GDC,md5sum,['files']
+CDA,dbgap_accession_number,file,GDC,dbgap_accession_number,"['files', 'cases', 'project']"
+CDA,id,file,PDC,file_id,['files']
+CDA,identifier,file,PDC,file_id,['files']
+CDA,label,file,PDC,file_name,['files']
+CDA,data_category,file,PDC,data_category,['files']
+CDA,data_type,file,PDC,file_type,['files']
+CDA,file_format,file,PDC,file_format,['files']
+CDA,associated_project,file,PDC,project_submitter_id,['files']
+CDA,drs_uri,file,PDC,file_id,['files']
+CDA,byte_size,file,PDC,file_size,['files']
+CDA,checksum,file,PDC,md5sum,['files']
+CDA,dbgap_accession_number,file,PDC,dbgap_control_number,['files']
+CDA,id,file,IDC,crdc_instance_uuid,['files']
+CDA,identifier,file,IDC,crdc_instance_uuid,['files']
+CDA,label,file,IDC,gcs_url,['files']
+CDA,associated_project,file,IDC,collection_id,['files']
+CDA,drs_uri,file,IDC,crdc_instance_uuid,['files']
+CDA,imaging_modality,file,IDC,Modality,['files']
+CDA,imaging_series,file,IDC,crdc_series_uuid,['files']
