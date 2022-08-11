@@ -7,4 +7,8 @@ src/mdb_tools/mdb_tools.py
 src/mdb_tools.egg-info/PKG-INFO
 src/mdb_tools.egg-info/SOURCES.txt
 src/mdb_tools.egg-info/dependency_links.txt
+src/mdb_tools.egg-info/entry_points.txt
 src/mdb_tools.egg-info/top_level.txt
+src/mdb_tools/scripts/__init__.py
+src/mdb_tools/scripts/clean_cda_map_excel.py
+src/mdb_tools/scripts/link_synonym_ents_csv.py
