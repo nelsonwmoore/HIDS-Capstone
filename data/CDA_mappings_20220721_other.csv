@@ -1,4 +1,4 @@
-model_1,prop_handle_1,node_handle_1,model_2,prop_handle_2,node_handle_2
+ent_1_model,ent_1_handle,ent_1_extra_handles,ent_2_model,ent_2_handle,ent_2_extra_handles
 CDA,identifier.system,subject,GDC,GDC,GDC
 CDA,species,subject,GDC,Homo sapiens,Homo sapiens
 CDA,identifier.system,subject,PDC,PDC,PDC
